@@ -4,7 +4,14 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 #出走馬の過去の競争成績を取得
-def get_past_results(horseUrl, driver):
+def get_past_results(horseUrl):
+    options = webdriver.ChromeOptions()
+    options.add_argument('--headless')  # ヘッドレスモードを有効にする
+    options.add_argument('--disable-gpu')  # GPUを無効にする（ヘッドレスモードでのレンダリングを改善）
+    options.add_argument('--window-size=1920x1080')  # ウィンドウサイズを設定
+    options.add_argument('--ignore-certificate-errors')  # 証明書の検証を無効にする
+
+    driver = webdriver.Chrome(options=options)
     try:
         driver.get(horseUrl)
         WebDriverWait(driver, 10).until(
@@ -50,4 +57,4 @@ def get_past_results(horseUrl, driver):
         return []
 
     finally:
-        driver.quit()
+        pass
