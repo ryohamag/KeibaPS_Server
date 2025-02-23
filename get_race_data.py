@@ -6,7 +6,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import json
 import os
-from getPastResults import getPastResults
+from get_past_results import get_past_results
 
 #レース種別を取得
 def extract_race_type(race_type):
@@ -73,7 +73,7 @@ def get_race_data(driver, year, course, round, date, race_num):
         for link in horse_links:
             horse_url = link.get_attribute("href")
             horse_name = link.get_attribute("title")
-            horse_results = getPastResults(horse_url)
+            horse_results = get_past_results(horse_url)
             if horse_results:
                 #race_typeに合致するレースのタイムを抽出
                 matching_times = [(result["タイム"], result["開催"], result["馬場"], result["斤量"], result["通過"], result["ペース"]) for result in horse_results if result["距離"] == race_type]
@@ -106,7 +106,9 @@ def get_race_data(driver, year, course, round, date, race_num):
         pass
 
     #結果をJSONファイルに保存
-    output_file = f"{year}{course_num}{round}{date}{race_num}.json"
+    output_dir = "racedata"
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, f"{year}{course_num}{round}{date}{race_num}.json")
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(all_horses_results, f, ensure_ascii=False, indent=4)
 

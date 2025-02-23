@@ -3,9 +3,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-def getPastResults(horseUrl):
-    #出走馬の過去の競争成績を取得
-    driver = webdriver.Chrome()
+#出走馬の過去の競争成績を取得
+def get_past_results(horseUrl, driver):
     try:
         driver.get(horseUrl)
         WebDriverWait(driver, 10).until(
