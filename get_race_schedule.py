@@ -6,6 +6,9 @@ from urllib import parse
 import json
 import os
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
+import schedule
+import time
 
 def parse_url(url, search_s):
     """URLから指定されたクエリパラメータを抽出"""
@@ -84,8 +87,7 @@ def get_race_schedule(driver, year, month):
 
     return all_race_data
 
-# 使用例
-if __name__ == "__main__":
+def job():
     options = webdriver.ChromeOptions()
     options.add_argument('--headless')  # ヘッドレスモードを有効にする
     options.add_argument('--disable-gpu')  # GPUを無効にする（ヘッドレスモードでのレンダリングを改善）
@@ -94,17 +96,35 @@ if __name__ == "__main__":
 
     driver = webdriver.Chrome(options=options)
 
-    now = datetime.now()
-    year = now.year
-    month = now.month
+    try:
+        # 翌月の年と月を取得
+        now = datetime.now()
+        next_month = now + relativedelta(months=1)
+        year = next_month.year
+        month = next_month.month
 
-    race_data = get_race_schedule(driver, year, month)
+        race_data = get_race_schedule(driver, year, month)
 
-    #結果をJSONファイルに保存
-    output_dir = "raceschedule"
-    os.makedirs(output_dir, exist_ok=True)
-    output_file = os.path.join(output_dir, f"{year}{month:02}.json")
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(race_data, f, ensure_ascii=False, indent=4)
+        # 結果をJSONファイルに保存
+        output_dir = "raceschedule"
+        os.makedirs(output_dir, exist_ok=True)
+        output_file = os.path.join(output_dir, f"{year}{month:02}.json")
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(race_data, f, ensure_ascii=False, indent=4)
+        
+        print(f"結果をJSONファイルに保存しました: {output_file}")
     
-    print(f"結果をJSONファイルに保存しました: {output_file}")
+    finally:
+        driver.quit()
+
+def daily_check():
+    """毎日チェックして25日ならjobを実行"""
+    if datetime.now().day == 25:
+        job()
+
+# 毎日0時にdaily_check関数を実行するスケジュールを設定
+schedule.every().day.at("00:00").do(daily_check)
+
+while True:
+    schedule.run_pending()
+    time.sleep(1)
