@@ -1,8 +1,10 @@
 from selenium import webdriver
 from get_race_data import get_race_data
-from datetime import datetime
+from datetime import datetime, timedelta
 import schedule
 import time
+import json
+import os
 
 def job():
     options = webdriver.ChromeOptions()
@@ -38,7 +40,7 @@ def job():
     script_dir = os.path.dirname(__file__)
 
     #JSONファイルの相対パス
-    relative_path = "raceschedule/{year}{month:02d}.json"
+    relative_path = f"raceschedule/{year}{month:02d}.json"
 
     #JSONファイルの絶対パスを取得
     json_file_path = os.path.join(script_dir, relative_path)
@@ -48,7 +50,7 @@ def job():
         race_data = json.load(f)
 
     #指定した年月日
-    target_date1 = "{year}{month:02d}{tomorrow_date:02d}"
+    target_date1 = f"{year}{month:02d}{tomorrow_date}"
 
     #指定した年月日のrace_titlesを取得
     race_titles1 = []
@@ -62,13 +64,13 @@ def job():
         parts = title.split()
         if len(parts) == 3:
             times, course, day = parts
-            times = int(times.replace("回", ""))
-            day = int(day.replace("日目", ""))
+            times = times.replace("回", "").zfill(2)
+            day = day.replace("日目", "").zfill(2)
             for race_num in range(1, 13):
                 race_num_str = f"{race_num:02d}"  # 01, 02, ..., 12 の形式に変換
-                get_past_results(driver, year, course, times, day, race_num_str)
+                get_race_data(driver, year, course, times, day, race_num_str)
 
-    target_date2 = "{year}{month:02d}{day_after_tomorrow_date:02d}"
+    target_date2 = f"{year}{month:02d}{day_after_tomorrow_date}"
 
     #指定した年月日のrace_titlesを取得
     race_titles2 = []
@@ -82,13 +84,13 @@ def job():
         parts = title.split()
         if len(parts) == 3:
             times, course, day = parts
-            times = int(times.replace("回", ""))
-            day = int(day.replace("日目", ""))
+            times = times.replace("回", "").zfill(2)
+            day = day.replace("日目", "").zfill(2)
             for race_num in range(1, 13):
                 race_num_str = f"{race_num:02d}"  # 01, 02, ..., 12 の形式に変換
-                get_past_results(driver, year, course, times, day, race_num_str)
+                get_race_data(driver, year, course, times, day, race_num_str)
 
-    target_date3 = "{year}{month:02d}{three_days_later_date:02d}"
+    target_date3 = f"{year}{month:02d}{three_days_later_date}"
 
     race_titles3 = []
     for entry in race_data:
@@ -102,8 +104,8 @@ def job():
             parts = title.split()
             if len(parts) == 3:
                 times, course, day = parts
-                times = int(times.replace("回", ""))
-                day = int(day.replace("日目", ""))
+                times = times.replace("回", "").zfill(2)
+                day = day.replace("日目", "").zfill(2)
                 for race_num in range(1, 13):
                     race_num_str = f"{race_num:02d}"  # 01, 02, ..., 12 の形式に変換
                     get_race_data(driver, year, course, times, day, race_num_str)
