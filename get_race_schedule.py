@@ -5,7 +5,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from urllib import parse
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import schedule
 import time
@@ -103,7 +103,15 @@ def job():
         year = next_month.year
         month = next_month.month
 
-        race_data = get_race_schedule(driver, year, month)
+        # 週末の日付を計算
+        weekend = now + timedelta(days=(5 - now.weekday()) % 7)
+        weekend_month = weekend.month
+
+        # 週末が同一月か翌月かを判定
+        if weekend_month == now.month:
+            race_data = get_race_schedule(driver, now.year, now.month)
+        else:
+            race_data = get_race_schedule(driver, next_month.year, next_month.month)
 
         # 結果をJSONファイルに保存
         output_dir = "raceschedule"
@@ -117,13 +125,8 @@ def job():
     finally:
         driver.quit()
 
-def daily_check():
-    """毎日チェックして25日ならjobを実行"""
-    if datetime.now().day == 25:
-        job()
-
-# 毎日0時にdaily_check関数を実行するスケジュールを設定
-schedule.every().day.at("00:00").do(daily_check)
+#毎週水曜日13:00に開催日程を取得する
+schedule.every().wednesday.at("13:00").do(job)
 
 while True:
     schedule.run_pending()
