@@ -404,3 +404,9 @@ flask_app.py
 
 # racedata
 racedata
+
+# raceschedule
+raceschedule
+
+# test
+test.py
