@@ -124,10 +124,3 @@ def job():
     
     finally:
         driver.quit()
-
-#毎週水曜日13:00に開催日程を取得する
-schedule.every().wednesday.at("13:00").do(job)
-
-while True:
-    schedule.run_pending()
-    time.sleep(1)
