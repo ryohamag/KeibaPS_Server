@@ -1,10 +1,12 @@
 import schedule
 import time
 import threading
-from get_race_schedule import get_race_schedule
+from get_race_schedule import job
 from get_race_json import get_race_json
 from flask import Flask, send_file, request, jsonify
 import os
+from selenium import webdriver
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
@@ -26,8 +28,8 @@ def get_json():
         return jsonify({"error": "File not found"}), 404
 
 # スケジュール設定
-schedule.every().wednesday.at("13:00").do(get_race_schedule)
-schedule.every().friday.at("18:00").do(get_race_json)
+schedule.every().friday.at("12:05").do(job)
+schedule.every().friday.at("12:35").do(get_race_json)
 
 def run_scheduler():
     while True:

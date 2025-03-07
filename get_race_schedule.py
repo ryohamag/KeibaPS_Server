@@ -110,17 +110,22 @@ def job():
         # 週末が同一月か翌月かを判定
         if weekend_month == now.month:
             race_data = get_race_schedule(driver, now.year, now.month)
+            # 結果をJSONファイルに保存
+            output_dir = "raceschedule"
+            os.makedirs(output_dir, exist_ok=True)
+            output_file = os.path.join(output_dir, f"{year}{now.month:02}.json")
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(race_data, f, ensure_ascii=False, indent=4)
+            print(f"結果をJSONファイルに保存しました: {output_file}")
         else:
             race_data = get_race_schedule(driver, next_month.year, next_month.month)
-
-        # 結果をJSONファイルに保存
-        output_dir = "raceschedule"
-        os.makedirs(output_dir, exist_ok=True)
-        output_file = os.path.join(output_dir, f"{year}{month:02}.json")
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(race_data, f, ensure_ascii=False, indent=4)
-        
-        print(f"結果をJSONファイルに保存しました: {output_file}")
+            # 結果をJSONファイルに保存
+            output_dir = "raceschedule"
+            os.makedirs(output_dir, exist_ok=True)
+            output_file = os.path.join(output_dir, f"{year}{next_month.month:02}.json")
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(race_data, f, ensure_ascii=False, indent=4)
+            print(f"結果をJSONファイルに保存しました: {output_file}")
     
     finally:
         driver.quit()
