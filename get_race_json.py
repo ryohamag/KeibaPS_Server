@@ -1,4 +1,6 @@
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from get_race_data import get_race_data
 from datetime import datetime, timedelta
 import time
@@ -11,8 +13,9 @@ def get_race_json():
     options.add_argument('--disable-gpu')  # GPUを無効にする（ヘッドレスモードでのレンダリングを改善）
     options.add_argument('--window-size=1920x1080')  # ウィンドウサイズを設定
     options.add_argument('--ignore-certificate-errors')  # 証明書の検証を無効にする
+    options.binary_location = '/usr/bin/chromium-browser'  # Chromiumのパスを指定
 
-    driver = webdriver.Chrome(options=options)
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
     #現在の日付と時刻を取得
     now = datetime.now()
