@@ -28,7 +28,7 @@ def get_json():
         return jsonify({"error": "File not found"}), 404
 
 # スケジュール設定
-schedule.every().tuesday.at("23:458").do(job)
+schedule.every().tuesday.at("23:58").do(job)
 schedule.every().tuesday.at("16:00").do(get_race_json)
 
 def run_scheduler():
