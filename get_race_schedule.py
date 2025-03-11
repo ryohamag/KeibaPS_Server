@@ -95,8 +95,9 @@ def job():
     options.add_argument('--disable-gpu')  # GPUを無効にする（ヘッドレスモードでのレンダリングを改善）
     options.add_argument('--window-size=1920x1080')  # ウィンドウサイズを設定
     options.add_argument('--ignore-certificate-errors')  # 証明書の検証を無効にする
-
-    driver = webdriver.Chrome(executable_path='/usr/bin/chromedriver', options=options)
+    service = Service('/usr/bin/chromedriver')
+    
+    driver = webdriver.Chrome(service=service, options=options)
 
     try:
         # 翌月の年と月を取得
