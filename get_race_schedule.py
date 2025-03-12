@@ -100,6 +100,8 @@ def job():
     driver = webdriver.Chrome(service=service, options=options)
 
     try:
+        print("開催日とコースの取得を開始します")
+
         # 翌月の年と月を取得
         now = datetime.now()
         next_month = now + relativedelta(months=1)
