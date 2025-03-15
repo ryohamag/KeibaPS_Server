@@ -94,8 +94,9 @@ def job():
     options.add_argument('--window-size=1920x1080')  # ウィンドウサイズを設定
     options.add_argument('--ignore-certificate-errors')  # 証明書の検証を無効にする
     options.binary_location = "/usr/bin/google-chrome"
+    chrome_driver_path = "/usr/bin/chromedriver"
 
-    driver = webdriver.Chrome(options=options)
+    driver = webdriver.Chrome(chrome_driver_path, options=options)
 
     try:
         # 翌月の年と月を取得
