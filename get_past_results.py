@@ -10,10 +10,10 @@ def get_past_results(horseUrl):
     options.add_argument('--disable-gpu')  # GPUを無効にする（ヘッドレスモードでのレンダリングを改善）
     options.add_argument('--window-size=1920x1080')  # ウィンドウサイズを設定
     options.add_argument('--ignore-certificate-errors')  # 証明書の検証を無効にする
-    options.binary_location = "/usr/bin/google-chrome"
-    chrome_driver_path = "/usr/bin/chromedriver"
+    # options.binary_location = "/usr/bin/google-chrome"
+    # chrome_driver_path = "/usr/bin/chromedriver"
 
-    driver = webdriver.Chrome(chrome_driver_path, options=options)
+    driver = webdriver.Chrome(options=options)
     try:
         driver.get(horseUrl)
         WebDriverWait(driver, 10).until(
