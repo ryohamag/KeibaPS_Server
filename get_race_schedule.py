@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import schedule
 import time
+from google.cloud import storage
+from upload_to_gcs import upload_to_gcs
 
 def parse_url(url, search_s):
     """URLから指定されたクエリパラメータを抽出"""
@@ -119,6 +121,11 @@ def job():
             with open(output_file, "w", encoding="utf-8") as f:
                 json.dump(race_data, f, ensure_ascii=False, indent=4)
             print(f"結果をJSONファイルに保存しました: {output_file}")
+            # GCSへアップロード
+            bucket_name = "keibaps-data"  # GCSバケット名をここに
+            destination_blob_name = f"raceschedule/{year}{now.month:02}.json"
+            upload_to_gcs(bucket_name, output_file, destination_blob_name)
+
         else:
             race_data = get_race_schedule(driver, next_month.year, next_month.month)
             # 結果をJSONファイルに保存
@@ -128,6 +135,9 @@ def job():
             with open(output_file, "w", encoding="utf-8") as f:
                 json.dump(race_data, f, ensure_ascii=False, indent=4)
             print(f"結果をJSONファイルに保存しました: {output_file}")
-    
+            # GCSへアップロード
+            bucket_name = "keibaps-data"  # GCSバケット名をここに
+            destination_blob_name = f"raceschedule/{year}{now.month:02}.json"
+            upload_to_gcs(bucket_name, output_file, destination_blob_name)
     finally:
         driver.quit()

@@ -7,6 +7,8 @@ from selenium.webdriver.support import expected_conditions as EC
 import json
 import os
 from get_past_results import get_past_results
+from google.cloud import storage
+from upload_to_gcs import upload_to_gcs
 
 #レース種別を取得
 def extract_race_type(race_type):
@@ -113,3 +115,7 @@ def get_race_data(driver, year, course, round, date, race_num):
         json.dump(all_horses_results, f, ensure_ascii=False, indent=4)
 
     print(f"結果をJSONファイルに保存しました: {os.path.abspath(output_file)}")
+    # GCSへアップロード
+    bucket_name = "keibaps-data"  # GCSバケット名をここに
+    destination_blob_name = f"racedata/{year}{course_num}{round}{date}{race_num}.json"
+    upload_to_gcs(bucket_name, output_file, destination_blob_name)
