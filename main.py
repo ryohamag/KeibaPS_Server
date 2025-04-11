@@ -6,7 +6,7 @@ from get_race_json import get_race_json
 from datetime import datetime
 
 # スケジュール設定
-schedule.every().wednesday.at("18:00").do(job)
+schedule.every().wednesday.at("18:00").do(job) # 開催スケジュールの取得
 schedule.every().friday.at("18:00").do(get_race_json)
 schedule.every().saturday.at("18:00").do(get_race_json)
 schedule.every().sunday.at("18:00").do(get_race_json)
