@@ -11,10 +11,11 @@ def get_race_json():
     options.add_argument('--disable-gpu')  # GPUを無効にする（ヘッドレスモードでのレンダリングを改善）
     options.add_argument('--window-size=1920x1080')  # ウィンドウサイズを設定
     options.add_argument('--ignore-certificate-errors')  # 証明書の検証を無効にする
-    # options.binary_location = "/usr/bin/google-chrome"
-    # chrome_driver_path = "/usr/bin/chromedriver"
+    options.binary_location = "/usr/bin/google-chrome"
+    chrome_driver_path = "/usr/bin/chromedriver"
 
-    driver = webdriver.Chrome(options=options)
+    # driver = webdriver.Chrome(options=options)
+    driver = webdriver.Chrome(executable_path=chrome_driver_path, options=options)
 
     #現在の日付と時刻を取得
     now = datetime.now()
