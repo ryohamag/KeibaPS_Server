@@ -27,18 +27,20 @@ def get_race_json():
     tomorrow = now + timedelta(days=1)
     tomorrow_date = tomorrow.strftime("%d")
 
-    #スクリプトのディレクトリを取得
-    script_dir = os.path.dirname(__file__)
+    # GCSクライアントを初期化
+    client = storage.Client()
 
-    #JSONファイルの相対パス
-    relative_path = f"raceschedule/{year}{month:02d}.json"
+    # バケットを指定
+    bucket = client.bucket("keibaps-data")  # GCSバケット名をここに
 
-    #JSONファイルの絶対パスを取得
-    json_file_path = os.path.join(script_dir, relative_path)
+    # ファイル（Blob）を指定
+    blob = bucket.blob(f"raceschedule/{year}{month:02d}.json")
 
-    #JSONファイルを読み込む
-    with open(json_file_path, "r", encoding="utf-8") as f:
-        race_data = json.load(f)
+    # Blobの内容をダウンロードしてメモリ上に保持
+    json_bytes = blob.download_as_bytes()
+
+    # JSONをロード
+    race_data = json.load(BytesIO(json_bytes))
 
     #指定した年月日
     target_date1 = f"{year}{month:02d}{tomorrow_date}"
