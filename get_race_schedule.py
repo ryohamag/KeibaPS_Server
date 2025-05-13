@@ -11,6 +11,8 @@ import schedule
 import time
 from google.cloud import storage
 from upload_to_gcs import upload_to_gcs
+from tempfile import mkdtemp
+
 
 def parse_url(url, search_s):
     """URLから指定されたクエリパラメータを抽出"""
@@ -95,6 +97,11 @@ def job():
     options.add_argument('--disable-gpu')  # GPUを無効にする（ヘッドレスモードでのレンダリングを改善）
     options.add_argument('--window-size=1920x1080')  # ウィンドウサイズを設定
     options.add_argument('--ignore-certificate-errors')  # 証明書の検証を無効にする
+    options.add_argument('--disable-dev-shm-usage')  # 共有メモリの問題を回避
+
+    # 一意のユーザーデータディレクトリを指定
+    user_data_dir = mkdtemp()
+    options.add_argument(f"--user-data-dir={user_data_dir}")
     # options.binary_location = "/usr/bin/google-chrome"
     # chrome_driver_path = "/usr/bin/chromedriver"
 
@@ -142,6 +149,3 @@ def job():
             upload_to_gcs(bucket_name, output_file, destination_blob_name)
     finally:
         driver.quit()
-
-if __name__ == "__main__":
-    job()
