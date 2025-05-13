@@ -102,7 +102,8 @@ def job():
 
     try:
         # 翌月の年と月を取得
-        now = datetime.now()
+        # now = datetime.now()
+        now = datetime(2025, 5, 7)
         next_month = now + relativedelta(months=1)
         year = next_month.year
         month = next_month.month
@@ -141,3 +142,6 @@ def job():
             upload_to_gcs(bucket_name, output_file, destination_blob_name)
     finally:
         driver.quit()
+
+if __name__ == "__main__":
+    job()
