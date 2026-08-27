@@ -1,0 +1,20 @@
+name: Scrape - 日曜朝(当日差分チェック)
+
+on:
+  schedule:
+    - cron: "0 22 * * 6" # JST 日曜07:00
+  workflow_dispatch: {}
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Check today's changes against final version
+        env:
+          GOOGLE_SERVICE_ACCOUNT_BASE64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_BASE64 }}
+        run: python run_scrape.py --target today --diff

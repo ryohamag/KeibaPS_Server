@@ -402,6 +402,9 @@ FodyWeavers.xsd
 # racedata
 racedata
 
+# racediff
+racediff
+
 # raceschedule
 raceschedule
 

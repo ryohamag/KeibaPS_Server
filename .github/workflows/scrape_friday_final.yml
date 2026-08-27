@@ -1,0 +1,24 @@
+name: Scrape - 金曜夜(土曜分を確定/日曜分を再取得)
+
+on:
+  schedule:
+    - cron: "0 12 * * 5" # JST 金曜21:00
+  workflow_dispatch: {}
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Finalize tomorrow (Saturday) race cards
+        env:
+          GOOGLE_SERVICE_ACCOUNT_BASE64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_BASE64 }}
+        run: python run_scrape.py --target tomorrow --final
+      - name: Refresh day-after-tomorrow (Sunday) race cards
+        env:
+          GOOGLE_SERVICE_ACCOUNT_BASE64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_BASE64 }}
+        run: python run_scrape.py --target day_after_tomorrow
