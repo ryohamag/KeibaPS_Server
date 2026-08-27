@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from generate_race_diff import generate_and_upload_diff
 from get_race_data import get_race_data
-from race_schedule import get_race_ids_for_date
+from race_schedule import get_race_ids_for_date, upload_race_index
 
 JST = timezone(timedelta(hours=9))
 
@@ -60,6 +60,7 @@ def main():
     for kaisai_date in target_dates:
         race_ids = get_race_ids_for_date(kaisai_date)
         print(f"{kaisai_date}: {len(race_ids)}レース")
+        upload_race_index(kaisai_date, race_ids, is_final=args.final)
 
         for race_id in race_ids:
             try:
