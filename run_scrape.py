@@ -43,8 +43,12 @@ def main():
     parser.add_argument(
         "--target",
         choices=["saturday", "sunday", "weekend"],
-        required=True,
         help="saturday=直近の土曜 / sunday=直近の日曜 / weekend=直近の土日2日分",
+    )
+    parser.add_argument(
+        "--date",
+        metavar="YYYYMMDD",
+        help="対象日を直接指定する(--targetの代わりに使う。動作確認や過去データの再取得用)",
     )
     parser.add_argument(
         "--final",
@@ -58,7 +62,10 @@ def main():
     )
     args = parser.parse_args()
 
-    target_dates = resolve_target_dates(args.target)
+    if not args.target and not args.date:
+        parser.error("--target または --date のいずれかを指定してください")
+
+    target_dates = [args.date] if args.date else resolve_target_dates(args.target)
     print(f"対象日: {target_dates}")
 
     for kaisai_date in target_dates:
