@@ -10,25 +10,29 @@ JST = timezone(timedelta(hours=9))
 
 
 # --target の指定から、対象となる開催日(YYYYMMDD)のリストを求める
-# weekend: 直近(今日を含む)の土曜・日曜の2日分
-# tomorrow: 明日の1日分
-# today: 今日の1日分
+#
+# GitHub Actionsのscheduled workflowは実行時刻が数時間単位で遅延することがあり、
+# 遅延が深夜0時をまたぐと「今日」「明日」のような相対日付は指す日がズレてしまう
+# (例: 金曜21:00の予定が土曜7:00にずれ込むと、「明日」が土曜ではなく日曜になる)。
+# これを避けるため、実行時刻に関わらず常に同じ日を指す「直近の土曜/日曜」という
+# 絶対計算に統一している。実行が多少遅れても対象日はブレない。
+#
+# saturday: 直近(今日を含む)の土曜
+# sunday: 直近(今日を含む)の土曜の翌日(=直近の日曜)
+# weekend: 上記2日分
 def resolve_target_dates(target):
     now = datetime.now(JST)
+    days_until_sat = (5 - now.weekday()) % 7
+    saturday = now + timedelta(days=days_until_sat)
+    sunday = saturday + timedelta(days=1)
 
-    if target == "today":
-        return [now.strftime("%Y%m%d")]
+    if target == "saturday":
+        return [saturday.strftime("%Y%m%d")]
 
-    if target == "tomorrow":
-        return [(now + timedelta(days=1)).strftime("%Y%m%d")]
-
-    if target == "day_after_tomorrow":
-        return [(now + timedelta(days=2)).strftime("%Y%m%d")]
+    if target == "sunday":
+        return [sunday.strftime("%Y%m%d")]
 
     if target == "weekend":
-        days_until_sat = (5 - now.weekday()) % 7
-        saturday = now + timedelta(days=days_until_sat)
-        sunday = saturday + timedelta(days=1)
         return [saturday.strftime("%Y%m%d"), sunday.strftime("%Y%m%d")]
 
     raise ValueError(f"unknown target: {target}")
@@ -38,9 +42,9 @@ def main():
     parser = argparse.ArgumentParser(description="netkeibaから出馬表データを取得しGCSへ保存する")
     parser.add_argument(
         "--target",
-        choices=["today", "tomorrow", "day_after_tomorrow", "weekend"],
+        choices=["saturday", "sunday", "weekend"],
         required=True,
-        help="today=当日 / tomorrow=翌日 / day_after_tomorrow=翌々日 / weekend=直近の土日2日分",
+        help="saturday=直近の土曜 / sunday=直近の日曜 / weekend=直近の土日2日分",
     )
     parser.add_argument(
         "--final",

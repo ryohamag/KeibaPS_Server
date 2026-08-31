@@ -14,11 +14,11 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - name: Finalize tomorrow (Saturday) race cards
+      - name: Finalize Saturday race cards
         env:
           GOOGLE_SERVICE_ACCOUNT_BASE64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_BASE64 }}
-        run: python run_scrape.py --target tomorrow --final
-      - name: Refresh day-after-tomorrow (Sunday) race cards
+        run: python run_scrape.py --target saturday --final
+      - name: Refresh Sunday race cards
         env:
           GOOGLE_SERVICE_ACCOUNT_BASE64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_BASE64 }}
-        run: python run_scrape.py --target day_after_tomorrow
+        run: python run_scrape.py --target sunday
