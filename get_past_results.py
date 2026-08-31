@@ -77,10 +77,22 @@ def get_past_results(horse_url):
                     return None
                 return cols_text[idx] or None
 
-            race_data.append({
+            # netkeiba側は上り(上がり3ハロン)のtdに、そのレースでの順位を
+            # class="rank_1"〜"rank_3"として埋め込んでいる(4位以下は付与なし)
+            agari_idx = header_index.get("上り")
+            agari_rank = None
+            if agari_idx is not None and agari_idx < len(cols):
+                for c in cols[agari_idx].get("class") or []:
+                    if c.startswith("rank_"):
+                        agari_rank = c.replace("rank_", "")
+                        break
+
+            record = {
                 internal_key: col(source_header)
                 for internal_key, source_header in COLUMN_MAP.items()
-            })
+            }
+            record["上がり順位"] = agari_rank
+            race_data.append(record)
 
         return race_data
 
