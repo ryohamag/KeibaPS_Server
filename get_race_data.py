@@ -115,27 +115,22 @@ def get_race_data(race_id, is_final=False):
         horse_url = entry["horse_url"]
         horse_results = get_past_results(horse_url) if horse_url else []
 
+        # 参考タイム: 今回と同じ距離・馬場種別(race_type)を過去に走った成績を優先し、
+        # 該当がなければ直近3走を代替として使う。過去成績(PastResult)と同じ形の
+        # レコードをそのまま使うことで、アプリ側の表示ロジックを完全に共通化できる
         if horse_results:
-            matching_times = [
-                (result["タイム"], result["開催"], result["馬場"], result["斤量"], result["通過"], result["ペース"])
-                for result in horse_results
-                if result["距離"] == race_type
-            ]
-            matched = bool(matching_times)
-            if not matching_times:
-                sample = horse_results[:3] if len(horse_results) >= 3 else horse_results
-                matching_times = [
-                    (result["タイム"], result["開催"], result["馬場"], result["斤量"], result["通過"], result["ペース"])
-                    for result in sample
-                ]
+            matching_results = [result for result in horse_results if result["距離"] == race_type]
+            matched = bool(matching_results)
+            if not matching_results:
+                matching_results = horse_results[:3] if len(horse_results) >= 3 else horse_results
         else:
-            matching_times = [("初出走", "初出走", "初出走", "初出走", "初出走", "初出走")]
+            matching_results = []
             matched = False
 
         all_horses_results.append({
             **entry,
             "results": horse_results,
-            "matching_times": matching_times,
+            "matching_results": matching_results,
             "matched": matched,
         })
 
