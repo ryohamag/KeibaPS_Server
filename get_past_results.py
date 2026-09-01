@@ -27,6 +27,7 @@ COLUMN_MAP = {
     "距離": "距離",
     "馬場": "馬場",
     "タイム": "タイム",
+    "タイム指数": "ﾀｲﾑ指数タイム指数(通常)タイム指数マスター",
     "着差": "着差",
     "通過": "通過",
     "ペース": "ペース",
@@ -75,7 +76,12 @@ def get_past_results(horse_url):
                 idx = header_index.get(header_name)
                 if idx is None or idx >= len(cols_text):
                     return None
-                return cols_text[idx] or None
+                value = cols_text[idx]
+                # "**" は非会員には非公開であることを示すマスク表示
+                # (タイム指数などは直近1走のみ実値が入り、それ以前はこのマスクになる)
+                if not value or value == "**":
+                    return None
+                return value
 
             # netkeiba側は上り(上がり3ハロン)のtdに、そのレースでの順位を
             # class="rank_1"〜"rank_3"として埋め込んでいる(4位以下は付与なし)
