@@ -1,3 +1,4 @@
+import json
 import os
 
 import requests
@@ -105,4 +106,45 @@ def send_embed(embed, webhook_url=None):
     if not webhook_url:
         raise RuntimeError("環境変数 DISCORD_WEBHOOK_URL が設定されていません")
     response = requests.post(webhook_url, json={"embeds": [embed]}, timeout=30)
+    response.raise_for_status()
+
+
+# 表を画像として添付して投稿する。画像の描画に失敗した場合(日本語フォント未導入など)は、
+# 通知自体が止まらないよう呼び出し側でテキスト版のembedにフォールバックする
+def send_images(summary, meta, webhook_url=None):
+    from report_image import render_longshot_table, render_race_table
+
+    webhook_url = webhook_url or os.getenv("DISCORD_WEBHOOK_URL")
+    if not webhook_url:
+        raise RuntimeError("環境変数 DISCORD_WEBHOOK_URL が設定されていません")
+
+    race_png = render_race_table(summary, meta)
+    longshot_png = render_longshot_table(summary, meta)
+
+    description = f"{meta['first_date']} 〜 {meta['last_date']}({meta['date_count']}開催日 / {summary['evaluated_races']}レース)"
+    if meta["excluded_snapshots"]:
+        description += f"\n結果混入のため除外したレース: {meta['excluded_snapshots']}"
+    payload = {
+        "embeds": [
+            {
+                "title": "KeibaPS 予想ランキングの回収率検証",
+                "description": description,
+                "color": 0x2E8B57,
+                "image": {"url": "attachment://race.png"},
+            },
+            {
+                "image": {"url": "attachment://longshot.png"},
+                "footer": {"text": "高配当1本で大きく振れるため、数百レース程度では誤差が大きい"},
+            },
+        ]
+    }
+    response = requests.post(
+        webhook_url,
+        data={"payload_json": json.dumps(payload)},
+        files={
+            "files[0]": ("race.png", race_png, "image/png"),
+            "files[1]": ("longshot.png", longshot_png, "image/png"),
+        },
+        timeout=60,
+    )
     response.raise_for_status()

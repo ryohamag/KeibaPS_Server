@@ -14,6 +14,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
+      # 結果の表を画像で描画するための日本語フォント
+      - run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
       - name: Fetch results and post backtest summary
         env:
           GOOGLE_SERVICE_ACCOUNT_BASE64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_BASE64 }}

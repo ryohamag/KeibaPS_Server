@@ -11,7 +11,7 @@ from backtest import (
     run_backtest,
 )
 from get_race_result import fetch_race_result, get_race_result
-from notify_discord import build_embed, send_embed
+from notify_discord import build_embed, send_embed, send_images
 
 
 def _print_summary(embed):
@@ -113,8 +113,13 @@ def main():
     _print_summary(embed)
 
     if args.notify:
-        send_embed(embed)
-        print("Discordへ投稿しました")
+        try:
+            send_images(summary, meta)
+            print("Discordへ画像で投稿しました")
+        except Exception as e:
+            print(f"画像での投稿に失敗したため、テキストで投稿します: {e}")
+            send_embed(embed)
+            print("Discordへテキストで投稿しました")
 
 
 if __name__ == "__main__":
