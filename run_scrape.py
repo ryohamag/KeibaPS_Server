@@ -20,8 +20,14 @@ JST = timezone(timedelta(hours=9))
 # saturday: 直近(今日を含む)の土曜
 # sunday: 直近(今日を含む)の土曜の翌日(=直近の日曜)
 # weekend: 上記2日分
+# monday: 直近(今日を含む)の月曜。祝日開催の月曜用。日曜夜に実行すると翌日が対象になる
 def resolve_target_dates(target):
     now = datetime.now(JST)
+
+    if target == "monday":
+        days_until_mon = (0 - now.weekday()) % 7
+        return [(now + timedelta(days=days_until_mon)).strftime("%Y%m%d")]
+
     days_until_sat = (5 - now.weekday()) % 7
     saturday = now + timedelta(days=days_until_sat)
     sunday = saturday + timedelta(days=1)
@@ -42,8 +48,8 @@ def main():
     parser = argparse.ArgumentParser(description="netkeibaから出馬表データを取得しGCSへ保存する")
     parser.add_argument(
         "--target",
-        choices=["saturday", "sunday", "weekend"],
-        help="saturday=直近の土曜 / sunday=直近の日曜 / weekend=直近の土日2日分",
+        choices=["saturday", "sunday", "weekend", "monday"],
+        help="saturday=直近の土曜 / sunday=直近の日曜 / weekend=直近の土日2日分 / monday=直近の月曜(祝日開催用)",
     )
     parser.add_argument(
         "--date",
@@ -60,6 +66,11 @@ def main():
         action="store_true",
         help="取得後、final版との差分を計算してGCSへアップロードする(当日朝ジョブ用)",
     )
+    parser.add_argument(
+        "--skip-if-no-races",
+        action="store_true",
+        help="対象日にレースが1件もなければ、何も保存せず終了する(祝日でない月曜など、開催がない日用)",
+    )
     args = parser.parse_args()
 
     if not args.target and not args.date:
@@ -71,6 +82,9 @@ def main():
     for kaisai_date in target_dates:
         race_ids = get_race_ids_for_date(kaisai_date)
         print(f"{kaisai_date}: {len(race_ids)}レース")
+        if not race_ids and args.skip_if_no_races:
+            print(f"{kaisai_date}は開催がないためスキップします")
+            continue
         upload_race_index(kaisai_date, race_ids, is_final=args.final)
 
         for race_id in race_ids:
