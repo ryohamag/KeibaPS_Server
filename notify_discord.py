@@ -2,7 +2,15 @@ import os
 
 import requests
 
-from backtest import BASELINE_RANKING, BETS
+from backtest import (
+    BASELINE_RANKING,
+    BETS,
+    LONGSHOT_ALL,
+    LONGSHOT_BANDS,
+    LONGSHOT_BASELINE,
+    LONGSHOT_MIN_ODDS,
+    LONGSHOT_TOP_N,
+)
 from ranking_logic import RANKINGS
 
 # 回収率が100%を超えたかどうかが一目で分かるよう、行頭に印を付ける
@@ -26,11 +34,51 @@ def _format_line(bet_name, stat):
     )
 
 
+def _format_horse_rate(rate):
+    return f"{rate * 100:.1f}%" if rate is not None else "-"
+
+
+def _format_longshot_line(band, stat):
+    if stat.horses == 0:
+        return f"{band}: 該当なし"
+    average_finish = f"{stat.average_finish:.1f}着" if stat.average_finish is not None else "-"
+    return (
+        f"{band}: {stat.horses}頭"
+        f" ・勝率 {_format_horse_rate(stat.win_rate)}"
+        f" ・複勝率 {_format_horse_rate(stat.place_rate)}"
+        f" ・単勝回収 **{_format_horse_rate(stat.tansho_recovery)}**"
+        f" ・複勝回収 **{_format_horse_rate(stat.fukusho_recovery)}**"
+        f" ・単複回収 **{_format_horse_rate(stat.combo_recovery)}**"
+        f" ・平均{average_finish}"
+    )
+
+
+# 黒オッズ(単勝10倍以上)なのに予想ランキング上位に来た馬を、1頭ずつ買った場合の成績
+def build_longshot_fields(summary):
+    bands = [LONGSHOT_ALL] + [name for name, _, _ in LONGSHOT_BANDS]
+    fields = []
+    for ranking in list(RANKINGS) + [LONGSHOT_BASELINE]:
+        if ranking == LONGSHOT_BASELINE:
+            name = f"□ 比較: {LONGSHOT_BASELINE}(ランキング不問)"
+        else:
+            name = f"◆ 黒オッズ × {ranking}ランキング上位{LONGSHOT_TOP_N}"
+        lines = [_format_longshot_line(band, summary["longshot"][ranking][band]) for band in bands]
+        fields.append({"name": name, "value": "\n".join(lines), "inline": False})
+    return fields
+
+
 def build_embed(summary, meta):
     fields = []
     for ranking in list(RANKINGS) + [BASELINE_RANKING]:
         lines = [_format_line(bet_name, summary["stats"][ranking][bet_name]) for bet_name, _, _ in BETS]
         fields.append({"name": f"■ {ranking}ランキング", "value": "\n".join(lines), "inline": False})
+
+    fields.append({
+        "name": f"━━ 黒オッズ(単勝{LONGSHOT_MIN_ODDS:g}倍以上)の馬を1頭ずつ単勝・複勝で購入 ━━",
+        "value": "ランキング上位なのに人気がない馬は、本当に好走しているか(比較は「黒オッズ全体」)",
+        "inline": False,
+    })
+    fields.extend(build_longshot_fields(summary))
 
     description = (
         f"期間: {meta['first_date']} 〜 {meta['last_date']}"

@@ -32,6 +32,15 @@ BETS = [
     ("三連複BOX 上位5頭", "sanrenpuku", 5),
 ]
 
+# 「黒オッズ(単勝10倍以上)なのに予想ランキング上位」の馬を1頭ずつ買った場合の検証条件
+# 人気順位ではなくオッズで切るのは、頭数によらず「市場が軽く見ている」度合いを表せるため
+# 結果を見てから条件を調整すると後付けになるので、ここで固定する
+LONGSHOT_MIN_ODDS = 10.0
+LONGSHOT_TOP_N = 3
+LONGSHOT_BANDS = [("10〜20倍", 10.0, 20.0), ("20〜50倍", 20.0, 50.0), ("50倍〜", 50.0, float("inf"))]
+LONGSHOT_ALL = "全体"
+LONGSHOT_BASELINE = "黒オッズ全体"
+
 # 予想ランキングの比較対象(アプリの予想ではなく、結果ページの人気順を使う)
 BASELINE_RANKING = "人気(参考)"
 
@@ -209,6 +218,109 @@ class BetStats:
         return (self.payout - self.best_race_payout) / stake if stake > 0 else None
 
 
+# 馬単位の集計(単勝・複勝を100円ずつ買った場合)
+class HorseStats:
+    def __init__(self):
+        self.horses = 0
+        self.wins = 0
+        self.tansho_payout = 0
+        self.fukusho_horses = 0  # 複勝が発売されたレースの頭数(複勝は出走5頭以下だと発売されない)
+        self.places = 0
+        self.fukusho_payout = 0
+        self.finish_sum = 0
+        self.finish_count = 0
+        # 単複(単勝+複勝を同額ずつ購入)。複勝が発売されたレースの馬だけを対象にする
+        self.combo_horses = 0
+        self.combo_payout = 0
+
+    def add(self, horse, payouts):
+        self.horses += 1
+
+        tansho = {n: w["payout"] for w in payouts.get("tansho") or [] for n in w["numbers"]}
+        tansho_payout = tansho.get(horse["horse_number"], 0)
+        if horse["horse_number"] in tansho:
+            self.wins += 1
+            self.tansho_payout += tansho_payout
+
+        fukusho_winners = payouts.get("fukusho") or []
+        if fukusho_winners:
+            self.fukusho_horses += 1
+            fukusho_payout = 0
+            for w in fukusho_winners:
+                if horse["horse_number"] in w["numbers"]:
+                    self.places += 1
+                    fukusho_payout += w["payout"]
+            self.fukusho_payout += fukusho_payout
+            self.combo_horses += 1
+            self.combo_payout += tansho_payout + fukusho_payout
+
+        if horse["finishing_order"] is not None:
+            self.finish_sum += horse["finishing_order"]
+            self.finish_count += 1
+
+    @property
+    def win_rate(self):
+        return self.wins / self.horses if self.horses else None
+
+    @property
+    def place_rate(self):
+        return self.places / self.fukusho_horses if self.fukusho_horses else None
+
+    @property
+    def tansho_recovery(self):
+        return self.tansho_payout / (self.horses * UNIT_STAKE) if self.horses else None
+
+    @property
+    def fukusho_recovery(self):
+        return self.fukusho_payout / (self.fukusho_horses * UNIT_STAKE) if self.fukusho_horses else None
+
+    @property
+    def combo_recovery(self):
+        return self.combo_payout / (self.combo_horses * UNIT_STAKE * 2) if self.combo_horses else None
+
+    @property
+    def average_finish(self):
+        return self.finish_sum / self.finish_count if self.finish_count else None
+
+
+def _odds_band(odds):
+    for name, low, high in LONGSHOT_BANDS:
+        if low <= odds < high:
+            return name
+    return None
+
+
+def run_longshot_analysis(records):
+    """予想ランキング上位かつ黒オッズの馬を、ランキング別・オッズ帯別に集計する"""
+    rankings = list(RANKINGS) + [LONGSHOT_BASELINE]
+    bands = [LONGSHOT_ALL] + [name for name, _, _ in LONGSHOT_BANDS]
+    stats = {r: {b: HorseStats() for b in bands} for r in rankings}
+
+    for record in records:
+        result = record["result"]
+        orders = build_predicted_orders(record["snapshot"], result)
+        if not orders:
+            continue
+        horses = {h["horse_number"]: h for h in result["results"] if h["started"]}
+
+        longshot_numbers = {
+            n for n, h in horses.items()
+            if h["odds"] is not None and h["odds"] >= LONGSHOT_MIN_ODDS
+        }
+        picks_by_ranking = {LONGSHOT_BASELINE: longshot_numbers}
+        for ranking in RANKINGS:
+            top = orders.get(ranking, [])[:LONGSHOT_TOP_N]
+            picks_by_ranking[ranking] = {n for n in top if n in longshot_numbers}
+
+        for ranking, numbers in picks_by_ranking.items():
+            for number in numbers:
+                horse = horses[number]
+                stats[ranking][LONGSHOT_ALL].add(horse, result["payouts"])
+                stats[ranking][_odds_band(horse["odds"])].add(horse, result["payouts"])
+
+    return stats
+
+
 def run_backtest(records):
     """records: [{"snapshot": ..., "result": ..., "kaisai_date": ...}]"""
     ranking_names = list(RANKINGS) + [BASELINE_RANKING]
@@ -229,4 +341,8 @@ def run_backtest(records):
                 if outcome is not None:
                     stats[ranking][bet_name].add(*outcome)
 
-    return {"stats": stats, "evaluated_races": evaluated_races}
+    return {
+        "stats": stats,
+        "longshot": run_longshot_analysis(records),
+        "evaluated_races": evaluated_races,
+    }
