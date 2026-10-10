@@ -1,0 +1,21 @@
+name: Backtest - 日曜夜(予想ランキングの回収率をDiscordへ通知)
+
+on:
+  schedule:
+    - cron: "30 12 * * 0" # JST 日曜21:30(土日の全レース結果が確定した後)
+  workflow_dispatch: {}
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Fetch results and post backtest summary
+        env:
+          GOOGLE_SERVICE_ACCOUNT_BASE64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_BASE64 }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python run_backtest.py --notify

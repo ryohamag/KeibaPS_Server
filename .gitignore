@@ -411,6 +411,9 @@ raceindex
 # raceschedule
 raceschedule
 
+# raceresult
+raceresult
+
 # test
 test.py
 
