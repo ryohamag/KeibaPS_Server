@@ -1,0 +1,20 @@
+name: Notify failure to Discord
+description: ジョブが失敗したとき、workflow名と実行ページのURLをDiscord Webhookへ投稿する
+
+inputs:
+  webhook-url:
+    description: Discord Webhook URL
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        WEBHOOK_URL: ${{ inputs.webhook-url }}
+        WORKFLOW: ${{ github.workflow }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        # 通知自体が失敗しても、元のジョブの失敗結果は変えない
+        jq -n --arg content "❌ ${WORKFLOW} が失敗しました"$'\n'"${RUN_URL}" '{content: $content}' \
+          | curl -sS -f -X POST -H "Content-Type: application/json" -d @- "$WEBHOOK_URL" || true

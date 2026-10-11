@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from generate_race_diff import generate_and_upload_diff
 from get_race_data import get_race_data
+from notify_picks import send_collection_report
 from race_schedule import get_race_ids_for_date, upload_race_index
 
 JST = timezone(timedelta(hours=9))
@@ -17,8 +18,13 @@ JST = timezone(timedelta(hours=9))
 # これを避けるため、実行時刻に関わらず常に同じ日を指す「直近の土曜/日曜」という
 # 絶対計算に統一している。実行が多少遅れても対象日はブレない。
 #
-# saturday: 直近(今日を含む)の土曜
-# sunday: 直近(今日を含む)の土曜の翌日(=直近の日曜)
+# 「直近の土曜」は、月〜土曜なら今日を含む次の土曜、日曜なら昨日の土曜とする。
+# 日曜に実行された場合に「来週の土曜」を指してしまうと、土曜夜21:00のジョブが
+# 遅延して日曜0時をまたいだとき、1週間先の開催日を対象にしてしまう
+# (日曜朝7:00の差分チェックも同様に来週を指していた)。
+#
+# saturday: 直近の土曜
+# sunday: 直近の土曜の翌日(=直近の日曜)
 # weekend: 上記2日分
 # monday: 直近(今日を含む)の月曜。祝日開催の月曜用。日曜夜に実行すると翌日が対象になる
 def resolve_target_dates(target):
@@ -28,8 +34,10 @@ def resolve_target_dates(target):
         days_until_mon = (0 - now.weekday()) % 7
         return [(now + timedelta(days=days_until_mon)).strftime("%Y%m%d")]
 
-    days_until_sat = (5 - now.weekday()) % 7
-    saturday = now + timedelta(days=days_until_sat)
+    if now.weekday() == 6:
+        saturday = now - timedelta(days=1)
+    else:
+        saturday = now + timedelta(days=(5 - now.weekday()) % 7)
     sunday = saturday + timedelta(days=1)
 
     if target == "saturday":
@@ -67,9 +75,9 @@ def main():
         help="取得後、final版との差分を計算してGCSへアップロードする(当日朝ジョブ用)",
     )
     parser.add_argument(
-        "--skip-if-no-races",
+        "--notify",
         action="store_true",
-        help="対象日にレースが1件もなければ、何も保存せず終了する(祝日でない月曜など、開催がない日用)",
+        help="取得完了後、結果の要約と各レースの予想上位をDiscord(環境変数 DISCORD_WEBHOOK_URL)へ投稿する",
     )
     args = parser.parse_args()
 
@@ -82,16 +90,21 @@ def main():
     for kaisai_date in target_dates:
         race_ids = get_race_ids_for_date(kaisai_date)
         print(f"{kaisai_date}: {len(race_ids)}レース")
-        if not race_ids and args.skip_if_no_races:
-            print(f"{kaisai_date}は開催がないためスキップします")
+        # 開催がない日や、レース一覧がまだ公開されていない日に、空のインデックスで
+        # 既存のデータを上書きしてしまわないよう、何も保存せずスキップする
+        if not race_ids:
+            print(f"{kaisai_date}はレースがないためスキップします")
             continue
         upload_race_index(kaisai_date, race_ids, is_final=args.final)
 
+        race_cards = []
+        failed_race_ids = []
         for race_id in race_ids:
             try:
-                get_race_data(race_id, is_final=args.final)
+                race_cards.append(get_race_data(race_id, is_final=args.final))
             except Exception as e:
                 print(f"取得に失敗しました race_id={race_id}: {e}")
+                failed_race_ids.append(race_id)
                 continue
 
             if args.diff:
@@ -102,6 +115,13 @@ def main():
 
             # netkeibaへの連続アクセスを避けるための待機
             time.sleep(1)
+
+        if args.notify:
+            # 通知の失敗でスクレイプ自体を失敗扱いにしない(データは保存済みのため)
+            try:
+                send_collection_report(kaisai_date, race_cards, failed_race_ids, is_final=args.final)
+            except Exception as e:
+                print(f"Discordへの通知に失敗しました: {e}")
 
 
 if __name__ == "__main__":
