@@ -57,7 +57,9 @@ def _race_field(race_card):
     race_id = race_card["race_id"]
     entry_count = sum(1 for e in race_card["entries"] if not e.get("is_scratched"))
     race_type = race_card.get("race_type") or ""
-    name = f"{_race_number(race_id)}R {race_card['race_title']} {race_type}({entry_count}頭)"
+    start_time = race_card.get("start_time")
+    start_label = f" {start_time}発走" if start_time else ""
+    name = f"{_race_number(race_id)}R{start_label} {race_card['race_title']} {race_type}({entry_count}頭)"
     picks = top_picks(race_card)
     value = "\n".join(f"**{ranking}** {_format_picks(picks[ranking])}" for ranking in RANKINGS)
     return {"name": name[:256], "value": value[:1024], "inline": False}

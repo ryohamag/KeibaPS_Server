@@ -29,6 +29,12 @@ def extract_race_type(race_data_text):
     return None
 
 
+# 同じテキストから発走時刻 "10:00" を抽出(表記がないページでは None)
+def extract_start_time(race_data_text):
+    match = re.search(r"(\d{1,2}:\d{2})発走", race_data_text)
+    return match.group(1) if match else None
+
+
 def _text_or_none(el):
     if el is None:
         return None
@@ -93,7 +99,9 @@ def fetch_race_card(race_id):
     race_title = _text_or_none(race_name_el) or "タイトルなし"
 
     race_data01 = soup.select_one(".RaceData01")
-    race_type = extract_race_type(race_data01.get_text(" ", strip=True)) if race_data01 else None
+    race_data_text = race_data01.get_text(" ", strip=True) if race_data01 else ""
+    race_type = extract_race_type(race_data_text)
+    start_time = extract_start_time(race_data_text)
 
     entries = []
     for tr in soup.select("tr.HorseList"):
@@ -101,14 +109,14 @@ def fetch_race_card(race_id):
         if entry is not None:
             entries.append(entry)
 
-    return race_title, race_type, entries
+    return race_title, race_type, start_time, entries
 
 
 # 出走馬のデータ(出走情報+過去成績)を取得し、jsonに保存してGCSへアップロードする
 # is_final=True の場合、前日確定版として racedata/final/ にも同じ内容を保存する
 # (当日朝の差分チェックはこの final 版と当日取得分を比較する)
 def get_race_data(race_id, is_final=False):
-    race_title, race_type, entries = fetch_race_card(race_id)
+    race_title, race_type, start_time, entries = fetch_race_card(race_id)
 
     all_horses_results = []
     for entry in entries:
@@ -138,6 +146,7 @@ def get_race_data(race_id, is_final=False):
         "race_id": race_id,
         "race_title": race_title,
         "race_type": race_type,
+        "start_time": start_time,
         "generated_at": datetime.now(JST).isoformat(),
         "entries": all_horses_results,
     }
