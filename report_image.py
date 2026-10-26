@@ -295,3 +295,159 @@ def render_longshot_table(summary, meta, previous_summary=None):
     canvas.text_left((margin, y + 52), "オッズはレース後の確定オッズ。件数が少ないうちは偶然の範囲を超えているとは言えない", "note", MUTED)
     canvas.text_left((margin, y + 72), f"小さい数字={_previous_text(meta)}", "note", MUTED)
     return canvas.png()
+
+
+# ---------------------------------------------------------------- 検定結果(月次)
+
+def _rate_with_count(hit, n):
+    return f"{hit / n * 100:.1f}% ({hit}/{n})" if n else "-"
+
+
+def _since_label(kaisai_date):
+    return f"{kaisai_date[:4]}/{kaisai_date[4:6]}/{kaisai_date[6:]}"
+
+
+def render_significance(result, meta):
+    from significance import (
+        ALPHA,
+        HYPOTHESIS_SINCE,
+        PRIMARY_METRIC,
+        PRIMARY_RANKING,
+        TARGET_RACES,
+    )
+
+    fonts = _load_fonts()
+    margin, width = 16, 1000
+    inner = width - margin * 2
+    canvas = _Canvas(width, 2400, fonts)  # 描画後に下の余白を切り詰める
+    since = _since_label(HYPOTHESIS_SINCE)
+
+    canvas.text_left((margin, 14), "検定結果(月次)", "title", INK)
+    canvas.text_left(
+        (margin, 46),
+        f"{meta['first_date']} 〜 {meta['last_date']}  ・ 偶然の範囲を超えているかを確かめる",
+        "note", MUTED,
+    )
+    y = 84
+
+    def section(title, note=None):
+        nonlocal y
+        canvas.rect((margin, y, 6, 26), HEADER_BG)
+        canvas.text_left((margin + 14, y), title, "main", INK)
+        y += 32
+        if note:
+            canvas.text_left((margin + 14, y), note, "note", MUTED)
+            y += 24
+        y += 6
+
+    def table(headers, widths, rows, row_h):
+        """rows: [[(テキスト行のリスト, 背景色), ...], ...]"""
+        nonlocal y
+        canvas.rect((margin, y, inner, 36), HEADER_BG)
+        x = margin
+        for header, w in zip(headers, widths):
+            canvas.text_center((x, y, w, 36), [(header, "head", WHITE)])
+            x += w
+        y += 36
+        for row in rows:
+            x = margin
+            for (lines, bg), w in zip(row, widths):
+                if bg:
+                    canvas.rect((x + 2, y + 2, w - 4, row_h - 4), bg)
+                canvas.text_center((x, y, w, row_h), lines)
+                x += w
+            y += row_h
+            canvas.hline(y, margin, margin + inner)
+        y += 16
+
+    # ---- 本命の仮説
+    primary = result["primary"]
+    section(
+        "本命の仮説(これだけで判定する)",
+        f"{PRIMARY_RANKING}上位{LONGSHOT_TOP_N}の黒オッズ馬は、同じオッズ帯の他の黒オッズ馬より{PRIMARY_METRIC}が高い",
+    )
+    canvas.text_left(
+        (margin + 14, y - 4),
+        f"検証期間: {since}〜(仮説を立てた後のデータだけ) {primary['races']}レース / 判定の目安 {TARGET_RACES}レース",
+        "note", MUTED,
+    )
+    y += 24
+    widths = [200, (inner - 200) // 2, inner - 200 - (inner - 200) // 2]
+    rows = []
+    for band in primary["bands"] + [{"band": "合計", **{k: primary[k] for k in ("top_n", "top_hit", "other_n", "other_hit")}}]:
+        rows.append([
+            ([(band["band"], "main_plain", INK)], None),
+            ([(_rate_with_count(band["top_hit"], band["top_n"]), "main_plain", INK)], None),
+            ([(_rate_with_count(band["other_hit"], band["other_n"]), "main_plain", INK)], None),
+        ])
+    table(["オッズ帯", f"{PRIMARY_RANKING}上位{LONGSHOT_TOP_N}の黒オッズ馬", "それ以外の黒オッズ馬"], widths, rows, 40)
+
+    if primary["p"] is None:
+        verdict, sub, bg, fg = "判定できません", "比較できる馬がまだいない", BASELINE_BG, MUTED
+    elif primary["significant"]:
+        verdict = f"有意(片側 p = {primary['p']:.3f} < {ALPHA})"
+        sub, bg, fg = "偶然だけでは説明しにくい差がある", PROFIT_BG, PROFIT_FG
+    else:
+        verdict = f"まだ有意ではない(片側 p = {primary['p']:.3f})"
+        sub = "偶然の範囲の差。"
+        sub += "目安のレース数に届くまで判断は保留" if primary["races"] < TARGET_RACES else "仮説は支持されていない"
+        bg, fg = BASELINE_BG, INK
+    canvas.rect((margin, y, inner, 70), bg)
+    canvas.text_center((margin, y, inner, 70), [(verdict, "main", fg), (sub, "sub", MUTED)])
+    y += 70 + 28
+
+    # ---- 参考: その他の比較
+    section(
+        "参考: その他の黒オッズ比較(判定には使わない)",
+        "比較を増やすほど偶然の「有意」が出やすいため、ここのp値は目安。全期間は仮説を立てる前のデータも含む",
+    )
+    widths = [220, (inner - 220) // 2, inner - 220 - (inner - 220) // 2]
+    rows = []
+    for item in result["exploratory"]:
+        cells = [([(f"{item['ranking']}上位{LONGSHOT_TOP_N} {item['metric']}", "main_plain", INK)], None)]
+        for key in ("all", "after"):
+            c = item[key]
+            if not c["top_n"] or not c["other_n"]:
+                cells.append(([("-", "main_plain", MUTED)], None))
+                continue
+            p = f"p = {c['p']:.3f}" if c["p"] is not None else "p = -"
+            cells.append(([
+                (f"{c['top_hit'] / c['top_n'] * 100:.1f}% vs {c['other_hit'] / c['other_n'] * 100:.1f}%", "main_plain", INK),
+                (p, "sub", MUTED),
+            ], None))
+        rows.append(cells)
+    table(["比較(上位3 vs それ以外)", "全期間", f"{since}〜"], widths, rows, 56)
+
+    # ---- 参考: 回収率の信頼区間
+    section(
+        "参考: 回収率の95%信頼区間(全期間)",
+        "レースを無作為に選び直して1万回集計したときに、回収率が収まる範囲",
+    )
+    rankings = list(RANKINGS) + [BASELINE_RANKING]
+    col_w = (inner - 200) // len(rankings)
+    widths = [inner - col_w * len(rankings)] + [col_w] * len(rankings)
+    rows = []
+    for bet_name, _, _ in BETS:
+        cells = [([(bet_name, "main_plain", INK)], None)]
+        for ranking in rankings:
+            entry = result["recovery"].get((ranking, bet_name))
+            if entry is None:
+                cells.append(([("-", "main_plain", MUTED)], None))
+                continue
+            bg, fg = None, INK
+            if entry["low"] >= 1:
+                bg, fg = PROFIT_BG, PROFIT_FG
+            elif entry.get("diff_low", 0) > 0:
+                bg, fg = BETTER_BG, BETTER_FG
+            cells.append(([
+                (_pct(entry["rate"]), "main_plain", fg),
+                (f"{entry['low'] * 100:.0f}〜{entry['high'] * 100:.0f}%", "sub", MUTED),
+            ], bg))
+        rows.append(cells)
+    table(["買い目"] + rankings, widths, rows, 56)
+
+    canvas.text_left((margin, y - 4), "緑=区間の下限が100%以上(黒字が偶然とは言いにくい) / 青=人気(参考)との差の区間が0より上(人気順より良いと言える)", "note", MUTED)
+    y += 30
+
+    canvas.image = canvas.image.crop((0, 0, width * SCALE, y * SCALE))
+    return canvas.png()

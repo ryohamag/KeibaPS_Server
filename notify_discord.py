@@ -112,8 +112,8 @@ def send_embed(embed, webhook_url=None):
 # 表を画像として添付して投稿する。画像の描画に失敗した場合(日本語フォント未導入など)は、
 # 通知自体が止まらないよう呼び出し側でテキスト版のembedにフォールバックする
 # previous_summary: 先週の通知時点の累計(前週比の表示用)
-# trend_png: 累計回収率の推移グラフ(月に1回だけ渡される)
-def send_images(summary, meta, previous_summary=None, trend_png=None, webhook_url=None):
+# trend_png / significance_png: 累計回収率の推移グラフと検定結果(月に1回だけ渡される)
+def send_images(summary, meta, previous_summary=None, trend_png=None, significance_png=None, webhook_url=None):
     from report_image import render_longshot_table, render_race_table
 
     webhook_url = webhook_url or os.getenv("DISCORD_WEBHOOK_URL")
@@ -150,7 +150,14 @@ def send_images(summary, meta, previous_summary=None, trend_png=None, webhook_ur
             "color": 0x4F46E5,
             "image": {"url": "attachment://trend.png"},
         })
-        files["files[2]"] = ("trend.png", trend_png, "image/png")
+        files[f"files[{len(files)}]"] = ("trend.png", trend_png, "image/png")
+    if significance_png:
+        payload["embeds"].append({
+            "title": "🧪 月次: 検定結果",
+            "color": 0x4F46E5,
+            "image": {"url": "attachment://significance.png"},
+        })
+        files[f"files[{len(files)}]"] = ("significance.png", significance_png, "image/png")
 
     response = requests.post(
         webhook_url,

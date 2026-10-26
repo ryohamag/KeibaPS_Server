@@ -109,7 +109,7 @@ def main():
     parser.add_argument(
         "--chart",
         action="store_true",
-        help="累計回収率の推移グラフを必ず付ける(省略時は、月が変わって最初の通知のときだけ付ける)",
+        help="月次の推移グラフと検定結果を必ず付ける(省略時は、月が変わって最初の通知のときだけ付ける)",
     )
     args = parser.parse_args()
 
@@ -140,6 +140,7 @@ def main():
     # 実行日ではなくデータで判定するので、cronの遅延で日付がずれても送り漏れ・二重送信がない
     is_new_month = previous_last_date is None or previous_last_date[:6] != dates[-1][:6]
     trend_png = None
+    significance_png = None
     if args.chart or is_new_month:
         try:
             from report_chart import render_trend_chart
@@ -147,10 +148,22 @@ def main():
             print("推移グラフを作成しました")
         except Exception as e:
             print(f"推移グラフの作成に失敗しました: {e}")
+        try:
+            from report_image import render_significance
+            from significance import run_significance
+            significance_png = render_significance(run_significance(records), meta)
+            print("検定結果を作成しました")
+        except Exception as e:
+            print(f"検定結果の作成に失敗しました: {e}")
 
     if args.notify:
         try:
-            send_images(summary, meta, previous_summary=previous_summary, trend_png=trend_png)
+            send_images(
+                summary, meta,
+                previous_summary=previous_summary,
+                trend_png=trend_png,
+                significance_png=significance_png,
+            )
             print("Discordへ画像で投稿しました")
         except Exception as e:
             print(f"画像での投稿に失敗したため、テキストで投稿します: {e}")
