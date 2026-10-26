@@ -35,6 +35,7 @@ HEADER_BG = (51, 65, 85)
 BASELINE_BG = (243, 244, 246)
 PROFIT_BG, PROFIT_FG = (198, 239, 206), (0, 97, 0)
 BETTER_BG, BETTER_FG = (219, 234, 254), (30, 64, 175)
+UP_FG, DOWN_FG = (21, 128, 61), (185, 28, 28)  # 前週比の良化/悪化
 
 
 def _load_fonts():
@@ -55,6 +56,24 @@ def _load_fonts():
 
 def _pct(rate):
     return f"{rate * 100:.1f}%" if rate is not None else "-"
+
+
+def _delta(value, previous, unit="pt", scale=100, lower_is_better=False):
+    """前週比の (テキスト, 文字色)。比べられない場合は None
+    ▲▼は会計の表記(▲=マイナス)と紛らわしいため、+/-の符号で表す"""
+    if value is None or previous is None:
+        return None
+    diff = (value - previous) * scale
+    if abs(diff) < 0.05:
+        return f"±0.0{unit}", MUTED
+    improved = diff < 0 if lower_is_better else diff > 0
+    return f"{diff:+.1f}{unit}", UP_FG if improved else DOWN_FG
+
+
+def _previous_text(meta):
+    if meta.get("previous_last_date"):
+        return f"前週比={meta['previous_last_date']}までの累計との差(緑=良化 / 赤=悪化)"
+    return "前週比=先週分のデータがないため表示なし"
 
 
 class _Canvas:
@@ -101,13 +120,13 @@ class _Canvas:
 
 # ---------------------------------------------------------------- レース単位の表
 
-def render_race_table(summary, meta):
+def render_race_table(summary, meta, previous_summary=None):
     fonts = _load_fonts()
     rankings = list(RANKINGS) + [BASELINE_RANKING]
-    label_w, col_w, row_h, head_h = 200, 180, 92, 40
+    label_w, col_w, row_h, head_h = 200, 180, 112, 40
     top, margin = 74, 16
     width = margin * 2 + label_w + col_w * len(rankings)
-    height = top + head_h + row_h * len(BETS) + 60
+    height = top + head_h + row_h * len(BETS) + 80
 
     canvas = _Canvas(width, height, fonts)
     canvas.text_left((margin, 14), "予想ランキング別の回収率(上位を購入)", "title", INK)
@@ -135,16 +154,22 @@ def render_race_table(summary, meta):
             profit = stat.recovery_rate >= 1
             if profit:
                 canvas.rect((x + 3, y + 3, col_w - 6, row_h - 6), PROFIT_BG)
-            canvas.text_center((x, y, col_w, row_h), [
-                (_pct(stat.recovery_rate), "main", PROFIT_FG if profit else INK),
+            lines = [(_pct(stat.recovery_rate), "main", PROFIT_FG if profit else INK)]
+            previous = previous_summary["stats"][ranking][bet_name] if previous_summary else None
+            delta = _delta(stat.recovery_rate, previous and previous.recovery_rate)
+            if delta:
+                lines.append((f"前週比 {delta[0]}", "sub", delta[1]))
+            lines += [
                 (f"的中率 {_pct(stat.hit_rate)}", "sub", MUTED),
                 (f"最大1本除外 {_pct(stat.recovery_rate_without_best)}", "sub", MUTED),
-            ])
+            ]
+            canvas.text_center((x, y, col_w, row_h), lines)
         y += row_h
         canvas.hline(y, margin, width - margin)
 
     canvas.text_left((margin, y + 12), "太字=回収率 / 緑=回収率100%超 / 最大1本除外=最も大きく当たった1レースを除いた回収率", "note", MUTED)
     canvas.text_left((margin, y + 32), "人気(参考)=結果ページの最終人気順で同じ買い方をした場合(比較用)", "note", MUTED)
+    canvas.text_left((margin, y + 52), _previous_text(meta), "note", MUTED)
     return canvas.png()
 
 
@@ -159,6 +184,21 @@ LONGSHOT_COLUMNS = [
     ("単複回収", 96),
     ("平均着順", 86),
 ]
+
+
+def _longshot_deltas(stat, previous):
+    """各列の前週比 (テキスト, 文字色) または None のリスト"""
+    if previous is None or previous.horses == 0:
+        return [None] * len(LONGSHOT_COLUMNS)
+    return [
+        (f"{stat.horses - previous.horses:+d}", MUTED),
+        _delta(stat.win_rate, previous.win_rate),
+        _delta(stat.place_rate, previous.place_rate),
+        _delta(stat.tansho_recovery, previous.tansho_recovery),
+        _delta(stat.fukusho_recovery, previous.fukusho_recovery),
+        _delta(stat.combo_recovery, previous.combo_recovery),
+        _delta(stat.average_finish, previous.average_finish, unit="着", scale=1, lower_is_better=True),
+    ]
 
 
 def _longshot_cells(stat, base):
@@ -190,14 +230,14 @@ def _longshot_cells(stat, base):
     ]
 
 
-def render_longshot_table(summary, meta):
+def render_longshot_table(summary, meta, previous_summary=None):
     fonts = _load_fonts()
     bands = [LONGSHOT_ALL] + [name for name, _, _ in LONGSHOT_BANDS]
     groups = [LONGSHOT_BASELINE] + list(RANKINGS)
-    label_w, band_w, row_h, head_h = 210, 84, 40, 40
+    label_w, band_w, row_h, head_h = 210, 84, 58, 40
     top, margin = 74, 16
     width = margin * 2 + label_w + band_w + sum(w for _, w in LONGSHOT_COLUMNS)
-    height = top + head_h + row_h * len(bands) * len(groups) + 80
+    height = top + head_h + row_h * len(bands) * len(groups) + 100
 
     canvas = _Canvas(width, height, fonts)
     canvas.text_left(
@@ -237,10 +277,15 @@ def render_longshot_table(summary, meta):
                 canvas.text_center((x, y, sum(w for _, w in LONGSHOT_COLUMNS), row_h), [("該当なし", "main_plain", MUTED)])
             else:
                 x = margin + label_w + band_w
-                for (text, bg, fg), (_, w) in zip(_longshot_cells(stat, base), LONGSHOT_COLUMNS):
+                previous = previous_summary["longshot"][group][band] if previous_summary else None
+                cells = zip(_longshot_cells(stat, base), _longshot_deltas(stat, previous), LONGSHOT_COLUMNS)
+                for (text, bg, fg), delta, (_, w) in cells:
                     if bg:
                         canvas.rect((x + 2, y + 2, w - 4, row_h - 4), bg)
-                    canvas.text_center((x, y, w, row_h), [(text, "main_plain", fg)])
+                    lines = [(text, "main_plain", fg)]
+                    if delta:
+                        lines.append((delta[0], "sub", delta[1]))
+                    canvas.text_center((x, y, w, row_h), lines)
                     x += w
             y += row_h
         canvas.hline(y, margin, width - margin, width=2)
@@ -248,4 +293,5 @@ def render_longshot_table(summary, meta):
     canvas.text_left((margin, y + 12), "緑=回収率100%超 / 青=同じオッズ帯の基準(黒オッズ全体)より良い(勝率・複勝率は高い、平均着順は小さい)", "note", MUTED)
     canvas.text_left((margin, y + 32), "基準=ランキングで絞る前の、同じオッズ帯の馬全体。全体の行は基準と帯の構成が違うため、帯ごとに比べる", "note", MUTED)
     canvas.text_left((margin, y + 52), "オッズはレース後の確定オッズ。件数が少ないうちは偶然の範囲を超えているとは言えない", "note", MUTED)
+    canvas.text_left((margin, y + 72), f"小さい数字={_previous_text(meta)}", "note", MUTED)
     return canvas.png()

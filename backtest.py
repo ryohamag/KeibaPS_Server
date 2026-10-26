@@ -321,6 +321,14 @@ def run_longshot_analysis(records):
     return stats
 
 
+# 先週の通知時点の累計と比べるため、最新の開催日を含む週(月〜日曜)より前のレースだけを返す
+# 祝日の月曜開催は、その週の日曜夜の通知で初めて結果が揃うため、週は月曜始まりで区切る
+def records_before_latest_week(records):
+    latest = max(datetime.strptime(r["kaisai_date"], "%Y%m%d") for r in records)
+    week_start = (latest - timedelta(days=latest.weekday())).strftime("%Y%m%d")
+    return [r for r in records if r["kaisai_date"] < week_start]
+
+
 def run_backtest(records):
     """records: [{"snapshot": ..., "result": ..., "kaisai_date": ...}]"""
     ranking_names = list(RANKINGS) + [BASELINE_RANKING]

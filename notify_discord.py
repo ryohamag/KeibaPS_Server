@@ -111,15 +111,17 @@ def send_embed(embed, webhook_url=None):
 
 # 表を画像として添付して投稿する。画像の描画に失敗した場合(日本語フォント未導入など)は、
 # 通知自体が止まらないよう呼び出し側でテキスト版のembedにフォールバックする
-def send_images(summary, meta, webhook_url=None):
+# previous_summary: 先週の通知時点の累計(前週比の表示用)
+# trend_png: 累計回収率の推移グラフ(月に1回だけ渡される)
+def send_images(summary, meta, previous_summary=None, trend_png=None, webhook_url=None):
     from report_image import render_longshot_table, render_race_table
 
     webhook_url = webhook_url or os.getenv("DISCORD_WEBHOOK_URL")
     if not webhook_url:
         raise RuntimeError("環境変数 DISCORD_WEBHOOK_URL が設定されていません")
 
-    race_png = render_race_table(summary, meta)
-    longshot_png = render_longshot_table(summary, meta)
+    race_png = render_race_table(summary, meta, previous_summary)
+    longshot_png = render_longshot_table(summary, meta, previous_summary)
 
     description = f"{meta['first_date']} 〜 {meta['last_date']}({meta['date_count']}開催日 / {summary['evaluated_races']}レース)"
     if meta["excluded_snapshots"]:
@@ -138,13 +140,22 @@ def send_images(summary, meta, webhook_url=None):
             },
         ]
     }
+    files = {
+        "files[0]": ("race.png", race_png, "image/png"),
+        "files[1]": ("longshot.png", longshot_png, "image/png"),
+    }
+    if trend_png:
+        payload["embeds"].append({
+            "title": "📈 月次: 累計回収率の推移",
+            "color": 0x4F46E5,
+            "image": {"url": "attachment://trend.png"},
+        })
+        files["files[2]"] = ("trend.png", trend_png, "image/png")
+
     response = requests.post(
         webhook_url,
         data={"payload_json": json.dumps(payload)},
-        files={
-            "files[0]": ("race.png", race_png, "image/png"),
-            "files[1]": ("longshot.png", longshot_png, "image/png"),
-        },
+        files=files,
         timeout=60,
     )
     response.raise_for_status()
